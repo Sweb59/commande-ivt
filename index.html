@@ -1043,6 +1043,11 @@
        SERVICE WORKER
        ================================================================== */
     if ('serviceWorker' in navigator) {
+        if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!window.__rechargeSW) { window.__rechargeSW = true; window.location.reload(); }
+            });
+        }
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service Worker: ' + err));
         });
