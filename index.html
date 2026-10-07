@@ -159,15 +159,34 @@
             .replace(/[^a-z0-9]+/g, '').slice(0, 24) || 'medecin';
     }
 
+    const COULEURS_MEDECINS = ['#7E57C2', '#E53935', '#1E88E5', '#8E24AA', '#F57F17', '#00897B', '#AD1457'];
+
+    /* Version de l'application :
+       null            -> version clinique (Dr Karkoutly, Dr Laffineur, ...)
+       tableau de noms -> version modèle (Médecin 1, Médecin 2, ...) : base vierge
+                          de médecins, à configurer par l'utilisateur.        */
+    const VERSION_MODELE = null;
+
+    function medecinsParDefaut() {
+        if (Array.isArray(VERSION_MODELE)) {
+            return VERSION_MODELE.map((nom, i) => ({
+                id: 'medecin' + (i + 1),
+                nom: nom,
+                couleur: COULEURS_MEDECINS[i % COULEURS_MEDECINS.length]
+            }));
+        }
+        return [
+            { id: 'karkoutly', nom: 'Dr Karkoutly', couleur: '#7E57C2' },
+            { id: 'laffineur', nom: 'Dr Laffineur', couleur: '#E53935' },
+            { id: 'doucet', nom: 'Dr Doucet', couleur: '#1E88E5' },
+            { id: 'richet', nom: 'Dr Richet', couleur: '#8E24AA' },
+            { id: 'buisset', nom: 'Dr Buisset', couleur: '#F57F17' }
+        ];
+    }
+
     function configParDefaut() {
         return {
-            medecins: [
-                { id: 'karkoutly', nom: 'Dr Karkoutly', couleur: '#7E57C2' },
-                { id: 'laffineur', nom: 'Dr Laffineur', couleur: '#E53935' },
-                { id: 'doucet', nom: 'Dr Doucet', couleur: '#1E88E5' },
-                { id: 'richet', nom: 'Dr Richet', couleur: '#8E24AA' },
-                { id: 'buisset', nom: 'Dr Buisset', couleur: '#F57F17' }
-            ],
+            medecins: medecinsParDefaut(),
             materielBase: [
                 { nom: "Bétadine Opht 20ml", ref: "1548498", qte: 2, famille: "Médicaments & Solutés", cond: 20, unite: "boîte", fixe: true },
                 { nom: "Aiguilles Jaunes", ref: "1078380", qte: 1, famille: "Aiguilles & Seringues", cond: 100, unite: "boîte" },
@@ -176,7 +195,7 @@
                 { nom: "Sterdex Unidose", ref: "1015711", qte: 1, famille: "Médicaments & Solutés", cond: 12, unite: "boîte" },
                 { nom: "Tétracaïne 1% 0.4ml", ref: "1017413", qte: 1, famille: "Médicaments & Solutés", cond: 100, unite: "boîte" }
             ],
-            materielSpecifique: {
+            materielSpecifique: Array.isArray(VERSION_MODELE) ? {} : {
                 'karkoutly': [
                     { nom: "Aiguilles Roses 18G", ref: "1053188", qte: 1, famille: "Aiguilles & Seringues", cond: 100, unite: "boîte" },
                     { nom: "Feutres dermographiques", ref: "1633514", qte: 1, famille: "Consommables & Sets", cond: 50, unite: "boîte" },
