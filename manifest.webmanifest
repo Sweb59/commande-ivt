@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Générateur de Commande IVT",
   "short_name": "Commande IVT",
-  "description": "Génération du bon de commande IVT - HPVA",
+  "description": "Génération du bon de commande IVT - @Swéb - EyeLabs",
   "lang": "fr",
   "start_url": "./",
   "scope": "./",
