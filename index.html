@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Générateur de Commande IVT</title>
+
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><g transform=%22rotate(45 50 50)%22><path d=%22M42 30 H58 V70 H42 Z%22 fill=%22%23E1F5FE%22 stroke=%22%230277BD%22 stroke-width=%224%22/><path d=%22M42 50 H58 V70 H42 Z%22 fill=%22%2381D4FA%22/><path d=%22M48 70 H52 V85 H48 Z%22 fill=%22%230277BD%22/><path d=%22M35 85 H65 V92 H35 Z%22 fill=%22%230277BD%22/><path d=%22M49 10 H51 V30 H49 Z%22 fill=%22%230277BD%22 stroke=%22%230277BD%22 stroke-width=%222%22/><path d=%22M38 30 H62 V35 H38 Z%22 fill=%22%230277BD%22/></g></svg>">
+
+<meta name="theme-color" content="#0288D1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Commande IVT">
+
+<script src="vendor/xlsx.full.min.js"></script>
+
+<style>
+    body { font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif; background-color: #F0F4F8; color: #333; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; padding-top: calc(20px + env(safe-area-inset-top)); padding-bottom: calc(20px + env(safe-area-inset-bottom)); box-sizing: border-box; }
+    
+    .card { background: #FFFFFF; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); padding: 40px; width: 100%; max-width: 480px; text-align: center; position: relative; z-index: 10; box-sizing: border-box; }
+    .card h2 { color: #0277BD; margin-top: 0; border-bottom: 2px solid #E1F5FE; padding-bottom: 10px; margin-bottom: 25px; }
+    .card p { font-size: 1.1rem; line-height: 1.5; margin-bottom: 20px; }
+    .doctor-name { font-weight: 700; font-size: 1.3rem; }
+    .instruction { font-size: 0.95rem; color: #546E7A; margin-top: -10px; margin-bottom: 25px; font-style: italic; }
+    
+    input[type="number"] { width: 150px; padding: 15px; font-size: 1.5rem; font-weight: bold; text-align: center; border: 2px solid #B3E5FC; border-radius: 8px; color: #0277BD; outline: none; margin-bottom: 25px; }
+    button { background-color: #0288D1; color: white; border: none; padding: 15px 30px; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; transition: opacity 0.2s; }
+    button:hover { opacity: 0.9; }
+    
+    .commande-table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 0.95rem; }
+    .commande-table th, .commande-table td { border: 1px solid #E1F5FE; padding: 12px; text-align: center; }
+    .commande-table th { background-color: #0277BD; color: white; }
+    
+    /* Classes pour masquer/afficher dynamiquement la colonne conditionnement */
+    .hide-cond .col-cond { display: none !important; }
+    
+    .copyright { position: fixed; bottom: 15px; width: 100%; text-align: center; font-size: 3.5rem; color: #90A4AE; opacity: 0.3; pointer-events: none; z-index: 1; }
+    
+    /* MODIFICATIONS POUR LE RESPONSIVE SANS SCROLL HORIZONTAL */
+    @media (max-width: 600px) {
+        .card { padding: 15px; }
+        input[type="number"] { width: 120px; padding: 10px; }
+        
+        /* On force le tableau à ne plus se comporter comme un tableau */
+        .commande-table, .commande-table thead, .commande-table tbody, .commande-table th, .commande-table td, .commande-table tr { 
+            display: block; 
+            width: 100%; 
+            box-sizing: border-box;
+        }
+        
+        /* On masque la ligne d'en-tête (Produit, Réf, etc.) car elle ne sert plus */
+        .commande-table thead tr { 
+            display: none; 
+        }
+        
+        /* Chaque ligne devient une "carte" encadrée */
+        .commande-table tr { 
+            margin-bottom: 15px;
+            border: 2px solid #E1F5FE;
+            border-radius: 8px;
+            background: white;
+            overflow: hidden;
+        }
+        
+        /* Configuration des cellules à l'intérieur de chaque carte */
+        .commande-table td { 
+            border: none;
+            border-bottom: 1px solid #F0F4F8; 
+            position: relative;
+            padding: 10px 10px 10px 45% !important; /* Laisse un espace à gauche pour le titre */
+            text-align: right !important; /* Le texte de la donnée va à droite */
+            min-height: 40px;
+        }
+        .commande-table td:last-child { border-bottom: none; }
+        
+        /* On injecte le titre de la colonne (récupéré depuis data-label) à gauche */
+        .commande-table td::before { 
+            content: attr(data-label); 
+            position: absolute;
+            left: 10px;
+            top: 12px;
+            width: 40%; 
+            text-align: left;
+            font-size: 0.85rem;
+            color: #78909C;
+            font-weight: normal;
+        }
+
+        /* Exception : La ligne de catégorie (Famille) doit rester normale */
+        .commande-table td.row-famille {
+            padding: 10px 15px !important;
+            text-align: left !important;
+            border-bottom: none;
+        }
+        .commande-table td.row-famille::before {
+            content: none; /* Pas de faux titre pour cette ligne */
+        }
+    }
+
+    @media print { 
+        .no-print, .copyright { display: none !important; } 
+        body { background: white; padding: 0; margin: 0; }
+        .card { box-shadow: none; max-width: 100%; padding: 0; margin: 0; }
+        .card h2 { margin-bottom: 10px; padding-bottom: 5px; font-size: 1.5rem; }
+        .card p { margin-bottom: 10px; font-size: 0.9rem; }
+        h3 { padding-bottom: 2px !important; font-size: 1.2rem; }
+        
+        /* Rétablissement du tableau normal pour l'impression */
+        .commande-table, .commande-table thead, .commande-table tbody, .commande-table th, .commande-table td, .commande-table tr { display: table-cell; }
+        .commande-table { display: table; margin-top: 10px !important; margin-bottom: 15px !important; }
+        .commande-table thead { display: table-header-group; }
+        .commande-table thead tr { display: table-row; }
+        .commande-table tbody { display: table-row-group; }
+        .commande-table tr { display: table-row; border: none; margin-bottom: 0; }
+        .commande-table td::before { content: none !important; }
+        .commande-table th, .commande-table td { border: 1px solid #E1F5FE; padding: 4px 8px !important; font-size: 0.85rem !important; text-align: center !important; }
+        
+        tr { page-break-inside: avoid; }
+        
+        .saut-de-page { 
+            page-break-before: always; 
+            break-before: page; 
+            margin-top: 0 !important; 
+        }
+    }
+</style>
+</head>
+<body>
+
+    <div id="app-container"></div>
+    <div class="copyright">© Swéb - HPVA</div>
+
+<script>
+    const listeMedecins = [
+        { id: 'karkoutly', nom: 'Dr Karkoutly', couleur: '#7E57C2' }, 
+        { id: 'laffineur', nom: 'Dr Laffineur', couleur: '#E53935' }, 
+        { id: 'doucet', nom: 'Dr Doucet', couleur: '#1E88E5' }, 
+        { id: 'richet', nom: 'Dr Richet', couleur: '#8E24AA' }, 
+        { id: 'buisset', nom: 'Dr Buisset', couleur: '#F57F17' }  
+    ];
+
+    let compteursIVT = {};
+    let indexMedecinActuel = 0;
+    let modeCorrection = false;
+    let donneesCommandeFinale = []; 
+
+    const materielBase = [
+        { nom: "Bétadine Opht 20ml", ref: "1548498", qte: 2, famille: "Médicaments & Solutés", cond: 20, unite: "boîte" },
+        { nom: "Aiguilles Jaunes", ref: "1078380", qte: 1, famille: "Aiguilles & Seringues", cond: 100, unite: "boîte" },
+        { nom: "Sets IVT", ref: "1640668", qte: 1, famille: "Consommables & Sets", cond: 76, unite: "carton" },
+        { nom: "Badigeons", ref: "1534736", qte: 1, famille: "Consommables & Sets", cond: 40, unite: "boîte" },
+        { nom: "Sterdex Unidose", ref: "1015711", qte: 1, famille: "Médicaments & Solutés", cond: 12, unite: "boîte" },
+        { nom: "Tétracaïne 1% 0.4ml", ref: "1017413", qte: 1, famille: "Médicaments & Solutés", cond: 100, unite: "boîte" }
+    ];
+
+    const materielSpecifique = {
+        'karkoutly': [
+            { nom: "Aiguilles Roses 18G", ref: "1053188", qte: 1, famille: "Aiguilles & Seringues", cond: 100, unite: "boîte" },
+            { nom: "Feutres dermographiques", ref: "1633514", qte: 1, famille: "Consommables & Sets", cond: 50, unite: "boîte" },
+            { nom: "Microsponges", ref: "1118761", qte: 1, famille: "Consommables & Sets", cond: 25, unite: "boîte" },
+            { nom: "Seringues de 20ml Luer Lock", ref: "1078408", qte: 1, famille: "Aiguilles & Seringues", cond: 100, unite: "boîte" },
+            { nom: "Gants Stériles 6.5", ref: "1558699", qte: 1, famille: "Gants Stériles", cond: 50, unite: "boîte" },
+            { nom: "Quinofree 0.3% 0.5ml", ref: "1532136", qte: 1, famille: "Médicaments & Solutés", cond: 20, unite: "boîte" },
+            { nom: "BSS Poche 500ml", ref: "1018394", qte: 1, famille: "Médicaments & Solutés", cond: 6, unite: "carton" }
+        ],
+        'laffineur': [
+            { nom: "Feutres dermographiques", ref: "1633514", qte: 1, famille: "Consommables & Sets", cond: 50, unite: "boîte" },
+            { nom: "Gants Stériles 8.5", ref: "1558703", qte: 1, famille: "Gants Stériles", cond: 50, unite: "boîte" },
+            { nom: "Na Cl 0.9%", ref: "1541039", qte: 1, famille: "Médicaments & Solutés", cond: 20, unite: "boîte" }
+        ],
+        'doucet': [
+            { nom: "Aiguilles Roses 18G", ref: "1053188", qte: 1, famille: "Aiguilles & Seringues", cond: 100, unite: "boîte" },
+            { nom: "Feutres dermographiques", ref: "1633514", qte: 1, famille: "Consommables & Sets", cond: 50, unite: "boîte" },
+            { nom: "Microsponges", ref: "1118761", qte: 1, famille: "Consommables & Sets", cond: 25, unite: "boîte" },
+            { nom: "Seringues de 20ml Luer Lock", ref: "1078408", qte: 1, famille: "Aiguilles & Seringues", cond: 100, unite: "boîte" },
+            { nom: "Gants Stériles 8", ref: "1558702", qte: 1, famille: "Gants Stériles", cond: 50, unite: "boîte" },
+            { nom: "Quinofree 0.3% 0.5ml", ref: "1532136", qte: 1, famille: "Médicaments & Solutés", cond: 20, unite: "boîte" },
+            { nom: "BSS Poche 500ml", ref: "1018394", qte: 1, famille: "Médicaments & Solutés", cond: 6, unite: "carton" }
+        ],
+        'richet': [
+            { nom: "Gants Stériles 7.5", ref: "1558701", qte: 1, famille: "Gants Stériles", cond: 50, unite: "boîte" },
+            { nom: "Na Cl 0.9%", ref: "1541039", qte: 1, famille: "Médicaments & Solutés", cond: 20, unite: "boîte" },
+            { nom: "Quinofree 0.3% 0.5ml", ref: "1532136", qte: 1, famille: "Médicaments & Solutés", cond: 20, unite: "boîte" }
+        ],
+        'buisset': [
+            { nom: "Gants Stériles 7.5", ref: "1558701", qte: 1, famille: "Gants Stériles", cond: 50, unite: "boîte" },
+            { nom: "Na Cl 0.9%", ref: "1541039", qte: 1, famille: "Médicaments & Solutés", cond: 20, unite: "boîte" }
+        ]
+    };
+
+    const materielAVerifier = [
+        { nom: "Alézes à Usage Unique (4 Sachets)", ref: "1637526" },
+        { nom: "Absorbex 40 x 60 (3 Paquets)", ref: "1254587" },
+        { nom: "Trocards avec filtre BD (une vingtaine)", ref: "1248956" },
+        { nom: "Coques Universelles (2 Boîtes)", ref: "1149497" },
+        { nom: "Compresses Ophta (2 Boîtes)", ref: "1051069" },
+        { nom: "Compresses Stériles 7.5 x 7.5 (2 Boîtes)", ref: "1242287" },
+        { nom: "Seringues 1ml Luer Lock (Une vingtaine)", ref: "1148318" },
+        { nom: "Bétadine Dermique 500ml (4 Flacons)", ref: "1548491" },
+        { nom: "Aniosgel 800 500ml (3 Flacons)", ref: "1650332" },
+        { nom: "Chibro Cadron Collyre 5ml (4 Flacons)", ref: "1015400" }
+    ];
+
+    window.onload = () => {
+        const sauvegarde = localStorage.getItem('saisieIVT_HPVA');
+        if (sauvegarde) { compteursIVT = JSON.parse(sauvegarde); }
+        afficherFenetre();
+    };
+
+    function sauvegarderSaisie() { localStorage.setItem('saisieIVT_HPVA', JSON.stringify(compteursIVT)); }
+    function reinitialiserSaisie() { localStorage.removeItem('saisieIVT_HPVA'); location.reload(); }
+    function obtenirDateFichier() {
+        const date = new Date();
+        const jour = String(date.getDate()).padStart(2, '0');
+        const mois = String(date.getMonth() + 1).padStart(2, '0');
+        const annee = date.getFullYear();
+        return `${jour}-${mois}-${annee}`;
+    }
+
+    function afficherFenetre() {
+        const container = document.getElementById('app-container');
+        if (indexMedecinActuel >= listeMedecins.length && !modeCorrection) {
+            afficherRecapitulatif();
+            return;
+        }
+        const medecin = listeMedecins[indexMedecinActuel];
+        const valeurSaisie = compteursIVT[medecin.id] !== undefined ? compteursIVT[medecin.id] : '';
+
+        let boutonRetour = '';
+        if (modeCorrection) {
+            boutonRetour = `<button onclick="annulerCorrection()" style="background-color: #78909C; flex: 1; margin-right:15px;">ANNULER</button>`;
+        } else if (indexMedecinActuel > 0) {
+            boutonRetour = `<button onclick="retourAuPrecedent()" style="background-color: #78909C; flex: 1; margin-right:15px;">⬅ RETOUR</button>`;
+        } else if (indexMedecinActuel === 0 && Object.keys(compteursIVT).length > 0) {
+             boutonRetour = `<button onclick="reinitialiserSaisie()" style="background-color: #D32F2F; flex: 1; margin-right:15px;">🔄 RÉ-INITIALISER</button>`;
+        }
+
+        container.innerHTML = `
+            <div class="card">
+                <h2>Nombre d'IVT réalisées</h2>
+                <p>Indiquez combien d'IVT a réalisé le <br><span class="doctor-name" style="color: ${medecin.couleur};">${medecin.nom}</span> <br>dans la case ci-dessous :</p>
+                <p class="instruction">
+                    Ne comptez pas le nombre de patients, mais le nombre d'étiquettes de produit dans le cahier de traçabilité.
+                </p>
+                <input type="number" id="inputIVT" min="0" value="${valeurSaisie}" placeholder="0">
+                <div style="display:flex;">
+                    ${boutonRetour}
+                    <button onclick="validerEtPasserAuSuivant()" style="flex: 1;">VALIDER</button>
+                </div>
+            </div>`;
+
+        const inputEl = document.getElementById('inputIVT');
+        inputEl.addEventListener('keypress', (e) => { if (e.key === 'Enter') validerEtPasserAuSuivant(); });
+        inputEl.focus();
+        setTimeout(() => { const v = inputEl.value; inputEl.value = ''; inputEl.value = v; }, 10);
+    }
+
+    function validerEtPasserAuSuivant() {
+        const input = document.getElementById('inputIVT');
+        compteursIVT[listeMedecins[indexMedecinActuel].id] = parseInt(input.value) || 0;
+        sauvegarderSaisie(); 
+        if (modeCorrection) { modeCorrection = false; indexMedecinActuel = listeMedecins.length; afficherRecapitulatif(); }
+        else { indexMedecinActuel++; afficherFenetre(); }
+    }
+    
+    function retourAuPrecedent() { if (indexMedecinActuel > 0) { indexMedecinActuel--; afficherFenetre(); } }
+    function annulerCorrection() { modeCorrection = false; indexMedecinActuel = listeMedecins.length; afficherRecapitulatif(); }
+
+    function afficherRecapitulatif() {
+        const container = document.getElementById('app-container');
+        let listeHtml = '<ul style="list-style: none; padding: 0; margin: 0 auto 25px auto; max-width: 300px; text-align: left;">';
+        listeMedecins.forEach(med => {
+            listeHtml += `<li style="padding: 10px 0; border-bottom: 1px solid #E1F5FE; display: flex; justify-content: space-between;">
+                <span style="font-weight: 500; color: ${med.couleur};">${med.nom}</span><strong style="color: #0277BD; font-size: 1.1rem;">${compteursIVT[med.id] || 0} IVT</strong></li>`;
+        });
+        listeHtml += '</ul>';
+
+        container.innerHTML = `
+            <div class="card">
+                <h2>Récapitulatif des saisies</h2>
+                <p>Vérifiez les quantités avant de générer le bon de commande :</p>
+                ${listeHtml}
+                <div style="display:flex; flex-direction:column; gap:15px;">
+                    <button onclick="terminerSaisie()">GÉNÉRER LA COMMANDE</button>
+                    <button onclick="afficherMenuCorrection()" style="background-color: #78909C;">CORRIGER UNE ERREUR</button>
+                </div>
+            </div>`;
+    }
+
+    function afficherMenuCorrection() {
+        const container = document.getElementById('app-container');
+        let boutons = '';
+        listeMedecins.forEach((med, index) => { 
+            boutons += `<button onclick="allerAuMedecin(${index})" style="margin-bottom: 10px; background-color: ${med.couleur};">${med.nom}</button>`; 
+        });
+        container.innerHTML = `<div class="card"><h2>Corriger une saisie</h2><p>Sélectionnez le médecin :</p><div style="display:flex; flex-direction:column;">${boutons}</div><button onclick="afficherRecapitulatif()" style="background-color: #78909C; margin-top: 15px;">⬅ RETOUR</button></div>`;
+    }
+
+    function allerAuMedecin(index) { modeCorrection = true; indexMedecinActuel = index; afficherFenetre(); }
+
+    function toggleConditionnement() {
+        const table = document.getElementById('table-commande');
+        const btn = document.getElementById('btn-toggle-cond');
+        
+        if (table.classList.contains('hide-cond')) {
+            table.classList.remove('hide-cond');
+            btn.innerHTML = '👁️ Masquer Conditionnement';
+            btn.style.backgroundColor = '#78909C';
+            document.querySelectorAll('.row-famille').forEach(el => el.setAttribute('colspan', '4'));
+        } else {
+            table.classList.add('hide-cond');
+            btn.innerHTML = '👁️ Afficher Conditionnement';
+            btn.style.backgroundColor = '#0288D1';
+            document.querySelectorAll('.row-famille').forEach(el => el.setAttribute('colspan', '3'));
+        }
+    }
+
+    function terminerSaisie() {
+        const container = document.getElementById('app-container');
+        let commandeFinale = {}; 
+        donneesCommandeFinale = []; 
+        const dateAffichage = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        for (const [idMedecin, nbIVT] of Object.entries(compteursIVT)) {
+            if (nbIVT === 0) continue; 
+            materielBase.forEach(item => {
+                if (!commandeFinale[item.nom]) commandeFinale[item.nom] = { ref: item.ref, qteTotal: 0, famille: item.famille, cond: item.cond, unite: item.unite };
+                commandeFinale[item.nom].qteTotal += (item.nom === "Bétadine Opht 20ml") ? item.qte : (item.qte * nbIVT);
+            });
+            if (materielSpecifique[idMedecin]) {
+                materielSpecifique[idMedecin].forEach(item => {
+                    if (!commandeFinale[item.nom]) commandeFinale[item.nom] = { ref: item.ref, qteTotal: 0, famille: item.famille, cond: item.cond, unite: item.unite };
+                    commandeFinale[item.nom].qteTotal += (item.nom === "BSS Poche 500ml") ? 1 : (item.qte * nbIVT);
+                });
+            }
+        }
+
+        const ordreFamilles = ["Médicaments & Solutés", "Aiguilles & Seringues", "Gants Stériles", "Consommables & Sets"];
+        let lignes = "";
+        ordreFamilles.forEach(f => {
+            let produits = Object.entries(commandeFinale).filter(([n, d]) => d.famille === f).sort((a,b) => a[0].localeCompare(b[0]));
+            if (produits.length > 0) {
+                // On garde colspan="3" par défaut pour affichage table classique
+                lignes += `<tr style="background:#E1F5FE"><td class="row-famille" colspan="3" style="text-align:left; font-weight:bold; color:#0277BD; padding:10px 15px;">📁 ${f}</td></tr>`;
+                produits.forEach(([nom, data]) => {
+                    let nbBoites = Math.ceil(data.qteTotal / data.cond);
+                    let libelleUnite = data.unite;
+                    if (nbBoites > 1) {
+                        if (libelleUnite === "boîte") libelleUnite = "boîtes";
+                        else if (libelleUnite === "carton") libelleUnite = "cartons";
+                        else if (libelleUnite === "lot") libelleUnite = "lots";
+                    }
+                    let texteConditionnement = `${nbBoites} ${libelleUnite}`;
+                    donneesCommandeFinale.push({ famille: f, nom: nom, ref: data.ref, qteTotal: data.qteTotal, conditionnement: texteConditionnement });
+                    
+                    // Ajout des attributs data-label pour le mobile
+                    lignes += `<tr>
+                        <td data-label="Produit :" style="text-align:left; font-weight:bold; padding-left:25px;">${nom}</td>
+                        <td data-label="Référence :">${data.ref}</td>
+                        <td data-label="Quantité :" style="font-weight:bold;">${data.qteTotal}</td>
+                        <td data-label="Conditionnement :" class="col-cond" style="color:#0288D1; font-weight:bold;">${texteConditionnement} <br><span style="font-size:0.75rem; font-weight:normal; color:#78909C;">(par ${data.cond})</span></td>
+                    </tr>`;
+                });
+            }
+        });
+
+        let lignesVerif = "";
+        materielAVerifier.forEach(item => {
+            lignesVerif += `<tr>
+                <td data-label="Produit :" style="text-align:left;">${item.nom}</td>
+                <td data-label="Référence :">${item.ref}</td>
+                <td data-label="Présent :"><input type="checkbox" style="width:20px; height:20px; margin:0;"></td>
+            </tr>`;
+        });
+
+        container.innerHTML = `
+            <div class="card" style="max-width: 800px; padding: 30px;">
+                <h2>Bon de Commande IVT</h2>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 10px;">
+                    <p style="font-size: 0.9rem; color: #78909C; font-style: italic; margin: 0;">Édité le ${dateAffichage}</p>
+                    <button id="btn-toggle-cond" onclick="toggleConditionnement()" class="no-print" style="width: auto; padding: 8px 15px; font-size: 0.85rem; margin: 0;">👁️ Afficher Conditionnement</button>
+                </div>
+
+                <table class="commande-table hide-cond" id="table-commande">
+                    <thead>
+                        <tr>
+                            <th>Produit</th>
+                            <th>Référence</th>
+                            <th>Quantité à commander</th>
+                            <th class="col-cond">Conditionnement</th>
+                        </tr>
+                    </thead>
+                    <tbody>${lignes}</tbody>
+                </table>
+
+                <h3 class="saut-de-page" style="margin-top:35px; color:#D32F2F; border-bottom: 2px solid #FFEBEE;">⚠️ À vérifier en stock (Dotation)</h3>
+                
+                <table class="commande-table" style="margin-bottom:30px;">
+                    <thead><tr style="background:#D32F2F"><th>Produit</th><th>Référence</th><th>Présent</th></tr></thead>
+                    <tbody>${lignesVerif}</tbody>
+                </table>
+
+                <div class="no-print" style="display:flex; gap:10px; flex-wrap: wrap;">
+                    <button onclick="window.print()" style="flex:1; min-width: 100%;">🖨️ IMPRIMER</button>
+                    <button onclick="exporterExcel()" style="flex:1; min-width: 100%; background-color: #4CAF50;">📊 GÉNÉRATION EXCEL</button>
+                    <button onclick="reinitialiserSaisie()" style="flex:1; min-width: 100%; background:#78909C;">🔄 RÉ-INITIALISER</button>
+                </div>
+            </div>`;
+    }
+
+    function exporterExcel() {
+        if (typeof XLSX === 'undefined') { alert("Veuillez être connecté à internet."); return; }
+        let dataForExcel = [["Famille", "Produit", "Référence", "Quantité à commander", "Conditionnement"]];
+        let familleActuelle = "";
+        donneesCommandeFinale.forEach(row => {
+            let affichageFamille = row.famille !== familleActuelle ? row.famille : "";
+            familleActuelle = row.famille;
+            dataForExcel.push([affichageFamille, row.nom, row.ref, row.qteTotal, row.conditionnement]);
+        });
+        const worksheet = XLSX.utils.aoa_to_sheet(dataForExcel);
+        worksheet['!cols'] = [{ wch: 25 }, { wch: 35 }, { wch: 15 }, { wch: 22 }, { wch: 20 }];
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Commande IVT");
+        XLSX.writeFile(workbook, `Commande IVT ${obtenirDateFichier()}.xlsx`);
+    }
+
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js').catch(err => console.warn('Service Worker: ' + err));
+        });
+    }
+</script>
+</body>
+</html>
